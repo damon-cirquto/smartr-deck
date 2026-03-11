@@ -15,6 +15,19 @@ const path = require('path');
 const PORT = parseInt(process.env.PORT || '8000', 10);
 const ROOT = __dirname;
 
+// ── Local IP detection ─────────────────────────────────────
+const nets = require('os').networkInterfaces();
+let localIP = 'localhost';
+for (const iface of Object.values(nets)) {
+  for (const addr of iface) {
+    if (addr.family === 'IPv4' && !addr.internal) {
+      localIP = addr.address;
+      break;
+    }
+  }
+  if (localIP !== 'localhost') break;
+}
+
 // ── MIME types ────────────────────────────────────────────
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -117,8 +130,19 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── Server info (for hub.html) ──
+  if (pathname === '/info') {
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'no-cache',
+    });
+    res.end(JSON.stringify({ ip: localIP, port: PORT }));
+    return;
+  }
+
   // ── Static files ──
-  let filePath = pathname === '/' ? '/deck.html' : pathname;
+  let filePath = pathname === '/' ? '/hub.html' : pathname;
   // Prevent directory traversal
   const safePath = path.normalize(filePath).replace(/^(\.\.[\/\\])+/, '');
   const fullPath = path.join(ROOT, safePath);
@@ -144,23 +168,10 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  // Get local IP for phone access
-  const nets = require('os').networkInterfaces();
-  let localIP = 'localhost';
-  for (const iface of Object.values(nets)) {
-    for (const addr of iface) {
-      if (addr.family === 'IPv4' && !addr.internal) {
-        localIP = addr.address;
-        break;
-      }
-    }
-    if (localIP !== 'localhost') break;
-  }
-
   console.log(`\n  ┌─────────────────────────────────────────────┐`);
   console.log(`  │  Smartr Deck Server                          │`);
   console.log(`  ├─────────────────────────────────────────────┤`);
-  console.log(`  │  Laptop  → http://localhost:${PORT}            │`);
-  console.log(`  │  Phone   → http://${localIP}:${PORT}/remote.html  │`);
+  console.log(`  │  Hub    → http://localhost:${PORT}              │`);
+  console.log(`  │  Phone  → http://${localIP}:${PORT}/remote-notes  │`);
   console.log(`  └─────────────────────────────────────────────┘\n`);
 });
